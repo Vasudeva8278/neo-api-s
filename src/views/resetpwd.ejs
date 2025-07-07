@@ -1,0 +1,59 @@
+<table
+  style="
+    width: 100%;
+    max-width: 660px;
+    margin-left: auto;
+    margin-right: auto;
+    font-family: 'Lato', sans-serif;
+  "
+>
+  <%- await include('header'); -%>
+  <tr>
+    <td>
+      <table style="width: 100%; font-family: 'Lato', sans-serif">
+        <tr>
+          <td
+            style="
+              padding: 20px 24px 60px 24px;
+              font-family: 'Lato', sans-serif;
+            "
+          >
+            <table>
+              <tr>
+                <td style="font-family: 'Lato', sans-serif">
+                  Hi, <%= user %>.
+                </td>
+              </tr>
+              <!-- <tr>
+                                <td style="font-family: 'Lato', sans-serif;">
+                                    Greetings!
+                                </td>
+                            </tr> -->
+              <tr>
+                <td style="font-family: 'Lato', sans-serif">
+                  Please click on following link to reset your password!
+                  <Br />
+                  <a
+                    href="<%= url %>"
+                    target="_blank"
+                    style="color: blue; text-decoration: underline"
+                  >
+                    <%= url %>
+                  </a>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="font-family: 'Lato', sans-serif">
+                  Best Regards,<br />
+                  Team Neo.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <%- await include('footer'); -%>
+      </table>
+    </td>
+  </tr>
+</table>
