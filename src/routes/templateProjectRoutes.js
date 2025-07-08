@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const templateProjectController = require('../controllers/templateProjectController');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
 
 // get all templates on loading page
 router.get('/:pid/templates/', templateProjectController.getAllTemplates);
@@ -23,7 +25,7 @@ router.delete('/delete-highlight/:templateId', templateProjectController.deleteH
 router.put('/:id', templateProjectController.updateTemplateById);
 
 
-router.post('/:pid/templates/converted', templateProjectController.convertedFile);
+router.post('/:pid/templates/converted', upload.single('file'), templateProjectController.convertedFile);
 
 router.get('/:id/download', templateProjectController.downloadTemplateById);
 
