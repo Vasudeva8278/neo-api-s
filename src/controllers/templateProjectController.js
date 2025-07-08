@@ -34,23 +34,30 @@ exports.getTemplateById = async (req, res, next) => {
 
 exports.convertedFile = async (req, res) => {
   const projectId = req.params.pid;
-  try {
-    const file = req.file;
-    //console.log(file);
-    let result;
-    try {
-      result = await fileService.uploadDocxToS3(
-        "Template",
-        file,
-        "",
-        "neo-templates-bucket"
-      );
-    } catch (err) {
-      console.error("Error while uploading file to AWS S3 bucket:", err);
-      //  return res.status(500).send("Failed to upload file to S3.");
-    }
-    console.log(result);
 
+  // Validate file and content
+  if (!req.file || !req.body.content) {
+    return res.status(400).json({ error: "File and content are required." });
+  }
+
+  let s3Result;
+  try {
+    // Upload file to S3
+    s3Result = await fileService.uploadDocxToS3(
+      "Template",
+      req.file,
+      "",
+      "neo-templates-bucket"
+    );
+    if (!s3Result || !s3Result.Location) {
+      throw new Error("S3 upload did not return a file location.");
+    }
+  } catch (err) {
+    console.error("Error uploading file to AWS S3 bucket:", err);
+    return res.status(500).json({ error: "Failed to upload file to S3." });
+  }
+
+  try {
     const fileName = req.file.originalname;
     const content = req.body.content;
     const thumbnail = await generateTemplateThumbnail(content);
@@ -59,15 +66,16 @@ exports.convertedFile = async (req, res) => {
       fileName,
       content,
       highlights: [],
-      locationUrl: result?.Location,
+      locationUrl: s3Result.Location,
       thumbnail,
-      projectId: projectId,
+      projectId,
     });
+
     await newTemplate.save();
-    res.json(newTemplate);
+    return res.status(201).json(newTemplate);
   } catch (error) {
-    console.error(error);
-    res.status(500).send("An error occurred during conversion.");
+    console.error("Error saving template:", error);
+    return res.status(500).json({ error: "An error occurred during conversion." });
   }
 };
 
