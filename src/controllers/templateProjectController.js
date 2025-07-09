@@ -4,16 +4,6 @@ const Template = require("../models/Template");
 const templateService = require("../services/templateService");
 const fileService = require("../services/fileService");
 const { generateTemplateThumbnail } = require("../utils/helper");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-const cheerio = require("cheerio");
-const htmlDocx = require("html-docx-js");
-
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB, adjust as needed
-});
 
 exports.getAllTemplates = async (req, res, next) => {
   const projectId = req.params.pid;
@@ -44,52 +34,40 @@ exports.getTemplateById = async (req, res, next) => {
 
 exports.convertedFile = async (req, res) => {
   const projectId = req.params.pid;
-
-  if (!req.file || !req.body.content) {
-    console.error("Missing file or content", { file: !!req.file, content: !!req.body.content });
-    return res.status(400).json({ error: "File and content are required." });
-  }
-
-  let s3Result;
   try {
-    console.log("Uploading file to S3...");
-    s3Result = await fileService.uploadDocxToS3(
-      "Template",
-      req.file,
-      "",
-      "neo-templates-bucket"
-    );
-    console.log("S3 upload result:", s3Result);
-    if (!s3Result || !s3Result.Location) {
-      throw new Error("S3 upload did not return a file location.");
+    const file = req.file;
+    //console.log(file);
+    let result;
+    try {
+      result = await fileService.uploadDocxToS3(
+        "Template",
+        file,
+        "",
+        "neo-templates-bucket"
+      );
+    } catch (err) {
+      console.error("Error while uploading file to AWS S3 bucket:", err);
+      //  return res.status(500).send("Failed to upload file to S3.");
     }
-  } catch (err) {
-    console.error("Error uploading file to AWS S3 bucket:", err);
-    return res.status(500).json({ error: "Failed to upload file to S3.", details: err.message });
-  }
+    console.log(result);
 
-  try {
     const fileName = req.file.originalname;
     const content = req.body.content;
-    console.log("Generating thumbnail...");
     const thumbnail = await generateTemplateThumbnail(content);
 
     const newTemplate = new Template({
       fileName,
       content,
       highlights: [],
-      locationUrl: s3Result.Location,
+      locationUrl: result?.Location,
       thumbnail,
-      projectId,
+      projectId: projectId,
     });
-
-    console.log("Saving new template to DB...");
     await newTemplate.save();
-    console.log("Template saved:", newTemplate._id);
-    return res.status(201).json(newTemplate);
+    res.json(newTemplate);
   } catch (error) {
-    console.error("Error saving template:", error);
-    return res.status(500).json({ error: error.message, stack: error.stack });
+    console.error(error);
+    res.status(500).send("An error occurred during conversion.");
   }
 };
 

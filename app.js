@@ -22,6 +22,7 @@ const clientRouter = require("./src/routes/clientRoutes");
 const roleRoutes = require("./src/routes/roleRoutes")
 const googleAuthRoutes = require("./src/routes/googleAuthRoutes");
 
+
 app.use(express.urlencoded({ extended: false }));
 //app.use(express.json());
 app.use(cors());

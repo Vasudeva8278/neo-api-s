@@ -6,8 +6,11 @@ const fileService = require("../services/fileService");
 const { generateTemplateThumbnail } = require("../utils/helper");
 
 exports.getAllTemplates = async (req, res, next) => {
+  const projectId = req.params.pid;
+  const query = { projectId: projectId };
+
   try {
-    const templates = await Template.find({}).populate("highlights");
+    const templates = await Template.find({ query }).populate("highlights");
     res.json(templates);
   } catch (error) {
     console.error(error);
@@ -16,37 +19,24 @@ exports.getAllTemplates = async (req, res, next) => {
 };
 
 exports.getTemplateById = async (req, res, next) => {
+  const projectId = req.params.pid;
+  const templateId = req.params.id;
+  console.log(projectId, templateId);
+  const query = { _id: templateId, projectId: projectId };
+
   try {
-    const template = await templateService.getTemplateById(req.params.id);
+    const template = await templateService.getTemplateById(query);
     res.json(template);
   } catch (error) {
     next(error);
   }
 };
 
-exports.convertFile = async (req, res) => {
-  try {
-    const fileBuffer = req.file.buffer;
-    const fileName = req.file.originalname;
-    const extension = fileName.split(".").pop();
-    const content = await fileService.extractText(fileBuffer, extension);
-    const newTemplate = new Template({
-      fileName,
-      content,
-      highlights: [],
-    });
-    await newTemplate.save();
-    res.json(newTemplate);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("An error occurred during conversion.");
-  }
-};
-
 exports.convertedFile = async (req, res) => {
+  const projectId = req.params.pid;
   try {
     const file = req.file;
-    console.log(file);
+    //console.log(file);
     let result;
     try {
       result = await fileService.uploadDocxToS3(
@@ -64,12 +54,14 @@ exports.convertedFile = async (req, res) => {
     const fileName = req.file.originalname;
     const content = req.body.content;
     const thumbnail = await generateTemplateThumbnail(content);
+
     const newTemplate = new Template({
       fileName,
       content,
       highlights: [],
       locationUrl: result?.Location,
       thumbnail,
+      projectId: projectId,
     });
     await newTemplate.save();
     res.json(newTemplate);
@@ -80,50 +72,12 @@ exports.convertedFile = async (req, res) => {
 };
 
 //api to add or update hightlights in template documents
-exports.updateTemplateContent = async (req, res) => {
-  try {
-    const { id } = req.params; //templateId;
-    const { content } = req.body;
-
-    const updatedTemplate = await Template.findByIdAndUpdate(
-      id,
-      { content: content },
-      { new: true }
-    ).populate("highlights");
-    // console.log("updatedTemplate:",updatedTemplate);
-
-    /* // Check if there are any documents associated with the template
-    const documents = await Document.find({ _id: { $in: updatedTemplate.documents } });
-    if (documents.length > 0) {
-      // Update each document with the new highlights
-      await Promise.all(documents.map(async (document) => {
-        const newHighlightRefs = newHighlights.map(h => ({
-          id: h._id,
-          highlightId: h.id,
-          label: h.label,
-          text:  h.text,
-          type: h.type,
-        }));
-        document.highlights.push(...newHighlightRefs);
-        document.content = content;
-        await document.save();
-      }));
-    }*/
-
-    res.status(201).send({ updatedTemplate });
-  } catch (error) {
-    console.log(error);
-    res.status(500).send(error.message);
-  }
-};
-
-//api to add or update hightlights in template documents
 exports.addNewHighlight = async (req, res) => {
+  const projectId = req.params.pid;
   try {
-    console.log("addNewHighlight req.body:", req.body);
     const { id } = req.params; //templateId;
     const { fileName, content, highlights } = req.body;
-    //console.log( " addNewHighlight highlights:" ,highlights)
+    console.log(" addNewHighlight highlights:", highlights);
     const highlightIds = [];
     const newHighlights = [];
     for (const highlight of highlights) {
@@ -192,10 +146,10 @@ exports.addNewHighlight = async (req, res) => {
 
 // to delete a Highlight in the template.
 exports.deleteHighlight = async (req, res) => {
+  const projectId = req.params.pid;
   try {
     const { templateId } = req.params;
     const { highlightId, content } = req.body;
-    console.log(highlightId);
 
     // Step 1: Delete the highlight from the highlight collection
     const deletedHighlight = await Highlight.findOneAndDelete({
@@ -242,13 +196,17 @@ exports.deleteHighlight = async (req, res) => {
 };
 
 exports.deleteTemplateById = async (req, res, next) => {
-  try {
-    const templateId = req.params.id;
+  const templateId = req.params.id;
 
-    // Find the template to get the associated highlights and documents
-    const template = await Template.findById(templateId);
+  try {
+    // Find the template by templateId
+    const template = await Template.findOne({
+      _id: templateId,
+    });
     if (!template) {
-      return res.status(404).send("Template not found");
+      return res
+        .status(404)
+        .send("Template not found or you do not have permission to delete it");
     }
 
     // Delete all highlights associated with the template
@@ -267,18 +225,37 @@ exports.deleteTemplateById = async (req, res, next) => {
 };
 
 exports.updateTemplateById = async (req, res, next) => {
+  const templateId = req.params.id;
+  const updateData = req.body;
+
   try {
-    const template = await templateService.updateTemplate(
-      req.params.id,
-      req.body
+    // Retrieve the template by ID
+    const template = await Template.findOne({
+      _id: templateId,
+    });
+
+    // Check if the template exists
+    if (!template) {
+      return res
+        .status(404)
+        .json({ message: "Template not found or access denied" });
+    }
+
+    // Update the template
+    const updatedTemplate = await templateService.updateTemplate(
+      templateId,
+      updateData
     );
-    res.json(template);
+
+    // Send the updated template as response
+    res.json(updatedTemplate);
   } catch (error) {
     next(error);
   }
 };
 
 exports.downloadTemplateById = async (req, res) => {
+  const projectId = req.params.pid;
   try {
     const { id } = req.params;
     const template = await Template.findById(id);
@@ -369,22 +346,34 @@ exports.exportTemplate = async (req, res) => {
 };
 
 exports.getAllTemplatesForHomePage = async (req, res, next) => {
+  const projectId = req.params.pid; // Extract projectId from the route parameters
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 5;
     const skip = (page - 1) * limit;
-    const templates = await Template.find({})
-      .select("_id fileName thumbnail createdAt projectId updatedTime")
-      .sort({ updatedTime: -1 })
-      // .skip(skip)
+
+    // Fetch templates associated with the given projectId
+    const templates = await Template.find({ projectId }) // Filter by projectId
+      .select("_id fileName thumbnail createdAt updatedTime")
+      .sort({ updatedTime: -1 }) // Sort by updatedTime in descending order
+      //.skip(skip)                 // Skip the records based on the current page
       // .limit(limit)
       .exec();
 
-    // Print projectId for each template
-    templates.forEach(t => {
-      console.log('Template:', t.fileName, 'projectId:', t.projectId);
-    });
+    res.json(templates);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("An error occurred while fetching templates.");
+  }
+};
 
+exports.getAllTemplatesByProjectId = async (req, res, next) => {
+  const projectId = req.params.pid; // Extract projectId from the route parameters
+  try {
+    // Fetch templates associated with the given projectId
+    const templates = await Template.find({ projectId }) // Filter by projectId
+      .select("_id fileName")
+      .exec();
     res.json(templates);
   } catch (error) {
     console.error(error);

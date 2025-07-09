@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const templateProjectController = require('../controllers/templateProjectController');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+
 
 // get all templates on loading page
 router.get('/:pid/templates/', templateProjectController.getAllTemplates);
@@ -8,6 +11,7 @@ router.get('/:pid/templates/homePageTemplates/', templateProjectController.getAl
 router.get('/:pid/templates/templatesList/', templateProjectController.getAllTemplatesByProjectId);
 
 
+router.post('/:pid/templates/converted', templateProjectController.convertedFile);
 //get template by on DocxToTextConverter
 router.get('/:pid/templates/:id', templateProjectController.getTemplateById);
 
